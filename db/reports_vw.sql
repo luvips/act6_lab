@@ -58,14 +58,29 @@ SELECT SUM(dinero_total) FROM view_sales_by_category;
 -- El total de dinero aquí debe ser igual a la suma de todas las ventas registradas.
 
 
--- REPORTE 3: 
--- VISTA: 
--- Qué devuelve: 
--- Grain: 
--- Métrica (s): 
+-- REPORTE 3: Mejores Clientes
+-- VISTA: view_top_customers
+-- Qué devuelve: Personas que han gastado más de $500 en total.
+-- Grain: Un cliente por fila.
+-- Métrica (s): SUM(ordenes.total)
 -- Por qué GROUP BY / HAVING / subconsulta:
+-- - GROUP BY para sumar el gasto por cada cliente
+-- - HAVING para filtrar solo clientes de alto valor (>$500)
+
 -- QUERY
+CREATE OR REPLACE VIEW view_top_customers AS
+SELECT 
+    u.nombre AS cliente
+    u.email AS correo,
+    SUM(o.total) AS total_gastado
+FROM usuarios u
+JOIN ordenes o ON u.id = o.usuario_id
+GROUP BY u.id, u.nombre, u.email
+HAVING SUM(o.total) > 500;
+
 -- VERIFY
+SELECT COUNT(*) FROM view_top_customers WHERE total_gastado <= 500;
+-- El resultado debe ser 0 ya que todos deben haber gastado más de 500.
 
 
 -- REPORTE 4: 
