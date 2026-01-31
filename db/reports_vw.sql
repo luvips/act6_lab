@@ -83,15 +83,32 @@ SELECT COUNT(*) FROM view_top_customers WHERE total_gastado <= 500;
 -- El resultado debe ser 0 ya que todos deben haber gastado más de 500.
 
 
--- REPORTE 4: 
--- VISTA: 
--- Qué devuelve: 
--- Grain: 
--- Métrica (s): 
+-- REPORTE 4: Estatus del Inventario
+-- VISTA: view_inventory_status
+-- Qué devuelve: Avisos sobre si hay productos por terminarse o agotados.
+-- Grain: Un producto por fila.
+-- Métrica (s): COUNT(*), CASE(productos.stock)
 -- Por qué GROUP BY / HAVING / subconsulta:
--- QUERY
--- VERIFY
+-- - GROUP BY para evaluar el stock individual de cada producto
+-- - CASE para generar etiquetas de texto según el nivel de piezas
 
+-- QUERY
+CREATE OR REPLACE VIEW view_inventory_status AS
+SELECT 
+    nombre AS producto,
+    stock AS piezas_en_bodega,
+    CASE 
+        WHEN stock = 0 THEN 'Agotado'
+        WHEN stock < 25 THEN 'Comprar pronto'
+        ELSE 'Suficiente'
+    END AS aviso_estatus,
+    COUNT(*) AS total_conteo
+FROM productos
+GROUP BY id, nombre, stock;
+
+-- VERIFY
+SELECT * FROM view_inventory_status WHERE piezas_en_bodega = 0;
+-- Los productos con 0 piezas deben tener el aviso 'Agotado'.
 
 -- REPORTE 5: 
 -- VISTA:   
