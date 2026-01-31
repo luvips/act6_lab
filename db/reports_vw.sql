@@ -11,10 +11,13 @@
 -- Qué devuelve: Lista de productos del más vendido al menos vendido.
 -- Grain: Un producto por fila.
 -- Métrica (s): SUM(orden_detalles.cantidad), RANK()
--- Por qué GROUP BY / HAVING: Suma unidades por producto y oculta los que no tienen ventas.
+-- Por qué GROUP BY / HAVING / subconsulta: 
+-- - GROUP BY para agregar por producto
+-- - HAVING para filtrar productos que no tienen ventas
+-- - Window Function (RANK) para construir el Top
 
 -- QUERY
-CREATE OR REPLACE VIEW vista_ranking_productos AS
+CREATE OR REPLACE VIEW view_ranking_products AS
 SELECT 
     p.nombre AS producto,
     SUM(od.cantidad) AS unidades_vendidas,
@@ -25,10 +28,12 @@ GROUP BY p.id, p.nombre
 HAVING SUM(od.cantidad) > 0;
 
 -- VERIFY
+SELECT * FROM view_ranking_products WHERE lugar_ranking = 1;
+-- El producto con el lugar 1 debe ser el que tiene más unidades vendidas.
 
 
 
--- REPORTE : 
+-- REPORTE 2: 
 -- VISTA: 
 -- Qué devuelve: 
 -- Grain: 
@@ -38,7 +43,7 @@ HAVING SUM(od.cantidad) > 0;
 -- VERIFY
 
 
--- REPORTE : 
+-- REPORTE 3: 
 -- VISTA: 
 -- Qué devuelve: 
 -- Grain: 
@@ -48,7 +53,7 @@ HAVING SUM(od.cantidad) > 0;
 -- VERIFY
 
 
--- REPORTE : 
+-- REPORTE 4: 
 -- VISTA: 
 -- Qué devuelve: 
 -- Grain: 
@@ -58,8 +63,8 @@ HAVING SUM(od.cantidad) > 0;
 -- VERIFY
 
 
--- REPORTE : 
--- VISTA: 
+-- REPORTE 5: 
+-- VISTA:   
 -- Qué devuelve: 
 -- Grain: 
 -- Métrica (s): 
@@ -68,7 +73,7 @@ HAVING SUM(od.cantidad) > 0;
 -- VERIFY
 
 
--- REPORTE : 
+-- REPORTE 6: 
 -- VISTA: 
 -- Qué devuelve: 
 -- Grain: 
