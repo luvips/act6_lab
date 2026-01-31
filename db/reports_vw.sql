@@ -110,14 +110,34 @@ GROUP BY id, nombre, stock;
 SELECT * FROM view_inventory_status WHERE piezas_en_bodega = 0;
 -- Los productos con 0 piezas deben tener el aviso 'Agotado'.
 
--- REPORTE 5: 
--- VISTA:   
--- Qué devuelve: 
--- Grain: 
--- Métrica (s): 
+-- REPORTE 5: Última Actividad
+-- VISTA: view_user_activity  
+-- Qué devuelve: Muestra cuándo fue la última compra de cada persona.
+-- Grain: Un cliente por fila.
+-- Métrica (s): MAX(ordenes.created_at), SUM(ordenes.total)
 -- Por qué GROUP BY / HAVING / subconsulta:
+-- - CTE (WITH) para precalcular la fecha más reciente de compra
+-- - GROUP BY para consolidar el historial total de cada usuario
+
 -- QUERY
+CREATE OR REPLACE VIEW view_user_activity AS
+WITH datos_recientes AS (
+    SELECT usuario_id, MAX(created_at) AS dia_ultima_compra
+    FROM ordenes
+    GROUP BY usuario_id
+)
+SELECT 
+    u.nombre AS cliente,
+    dr.dia_ultima_compra::date AS ultima_vez_visto,
+    SUM(o.total) AS gasto_historico
+FROM usuarios u
+JOIN datos_recientes dr ON u.id = dr.usuario_id
+JOIN ordenes o ON u.id = o.usuario_id
+GROUP BY u.id, u.nombre, dr.dia_ultima_compra;
+
 -- VERIFY
+SELECT COUNT(*) FROM view_user_activity;
+-- El total debe coincidir con los usuarios que tienen al menos una orden.
 
 
 -- REPORTE 6: 
