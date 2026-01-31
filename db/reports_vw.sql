@@ -70,7 +70,7 @@ SELECT SUM(dinero_total) FROM view_sales_by_category;
 -- QUERY
 CREATE OR REPLACE VIEW view_top_customers AS
 SELECT 
-    u.nombre AS cliente
+    u.nombre AS cliente,
     u.email AS correo,
     SUM(o.total) AS total_gastado
 FROM usuarios u
