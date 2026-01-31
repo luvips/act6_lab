@@ -140,12 +140,24 @@ SELECT COUNT(*) FROM view_user_activity;
 -- El total debe coincidir con los usuarios que tienen al menos una orden.
 
 
--- REPORTE 6: 
--- VISTA: 
--- Qué devuelve: 
--- Grain: 
--- Métrica (s): 
+-- REPORTE 6: Resumen de Pedidos
+-- VISTA: view_order_summary
+-- Qué devuelve: Cuántos pedidos hay en cada estado (entregado, pendiente, etc).
+-- Grain: Un estado de pedido por fila.
+-- Métrica (s): COUNT(ordenes.id), Porcentaje calculado
 -- Por qué GROUP BY / HAVING / subconsulta:
--- QUERY
--- VERIFY
+-- - GROUP BY para contar cuántas órdenes existen por cada status
+-- - Subconsulta para obtener el total global y calcular el porcentaje
 
+-- QUERY
+CREATE OR REPLACE VIEW view_order_summary AS
+SELECT 
+    status AS estado,
+    COUNT(*) AS total_pedidos,
+    ROUND((COUNT(*)::numeric / (SELECT COUNT(*) FROM ordenes)) * 100, 2) AS porcentaje
+FROM ordenes
+GROUP BY status;
+
+-- VERIFY
+SELECT SUM(porcentaje) FROM view_order_summary;
+-- La suma total de los porcentajes debe ser cercana a 100.
