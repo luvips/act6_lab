@@ -1,3 +1,4 @@
+
 services:
   db:
     image: postgres:16-alpine
@@ -21,6 +22,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  app:
+    build: ./frontend
+    container_name: nextjs_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://report_user:password123@db:5432/actividad_db
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
