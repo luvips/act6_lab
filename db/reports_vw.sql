@@ -33,14 +33,29 @@ SELECT * FROM view_ranking_products WHERE lugar_ranking = 1;
 
 
 
--- REPORTE 2: 
--- VISTA: 
--- Qué devuelve: 
--- Grain: 
--- Métrica (s): 
+-- REPORTE 2: Ventas por Categoría
+-- VISTA: view_sales_by_category
+-- Qué devuelve: Cuánto dinero se ha ganado en cada tipo de producto.
+-- Grain: Una categoría por fila.
+-- Métrica (s): COUNT(productos.id), SUM(orden_detalles.subtotal)
 -- Por qué GROUP BY / HAVING / subconsulta:
+-- - GROUP BY para agrupar los totales por categoría
+-- - COALESCE para manejar categorías sin ventas registradas
+
 -- QUERY
+CREATE OR REPLACE VIEW view_sales_by_category AS
+SELECT 
+    c.nombre AS categoria,
+    COUNT(p.id) AS productos_distintos,
+    COALESCE(SUM(od.subtotal), 0) AS dinero_total
+FROM categorias c
+LEFT JOIN productos p ON c.id = p.categoria_id
+LEFT JOIN orden_detalles od ON p.id = od.producto_id
+GROUP BY c.id, c.nombre;
+
 -- VERIFY
+SELECT SUM(dinero_total) FROM view_sales_by_category;
+-- El total de dinero aquí debe ser igual a la suma de todas las ventas registradas.
 
 
 -- REPORTE 3: 
