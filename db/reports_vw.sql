@@ -161,3 +161,26 @@ GROUP BY status;
 -- VERIFY
 SELECT SUM(porcentaje) FROM view_order_summary;
 -- La suma total de los porcentajes debe ser cercana a 100.
+
+
+-- REPORTE 7: Ventas Diarias
+-- VISTA: view_daily_sales
+-- Qué devuelve: Cuánto dinero se ha vendido cada día.
+-- Grain: Una fecha (día) por fila.
+-- Métrica (s): COUNT(ordenes.id), SUM(ordenes.total)
+-- Por qué GROUP BY / HAVING / subconsulta:
+-- - GROUP BY para agregar las ventas según el calendario
+-- - CAST (::date) para agrupar las órdenes por día sin importar la hora
+
+-- QUERY
+CREATE OR REPLACE VIEW view_daily_sales AS
+SELECT 
+    created_at::date AS fecha,
+    COUNT(id) AS numero_de_ventas,
+    SUM(total) AS dinero_del_dia
+FROM ordenes
+GROUP BY created_at::date;
+
+-- VERIFY
+SELECT SUM(dinero_del_dia) FROM view_daily_sales;
+-- La suma de todos los días debe ser igual al total de ventas.
