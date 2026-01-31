@@ -16,3 +16,5 @@ CREATE INDEX idx_productos_stock ON productos(stock);
 -- INDICE 4: Optimización de Fechas
 CREATE INDEX idx_ordenes_fecha ON ordenes(created_at);
 
+-- Verificación de índices creados
+SELECT indexname, tablename FROM pg_indexes WHERE schemaname = 'public';
