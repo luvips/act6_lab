@@ -6,9 +6,14 @@ import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination'
 
 export const dynamic = 'force-dynamic';
 
-export default async function OrderSummaryPage({ searchParams }: { searchParams: Record<string, string> }) {
+export default async function OrderSummaryPage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<Record<string, string>> 
+}) {
   const limit = 7;
-  const pagination = getPaginationParams(searchParams);
+  const resolvedSearchParams = await searchParams;
+  const pagination = getPaginationParams(resolvedSearchParams);
   const { offset } = getPaginationOffsetLimit(pagination.page, limit);
   
   const totalRes = await query('SELECT COUNT(*) as count FROM view_order_summary');
