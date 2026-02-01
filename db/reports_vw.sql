@@ -27,9 +27,20 @@ JOIN orden_detalles od ON p.id = od.producto_id
 GROUP BY p.id, p.nombre
 HAVING SUM(od.cantidad) > 0;
 
--- VERIFY
+-- VERIFY 1: El producto con lugar_ranking = 1 debe tener las mayores unidades_vendidas
 SELECT * FROM view_ranking_products WHERE lugar_ranking = 1;
--- El producto con el lugar 1 debe ser el que tiene más unidades vendidas.
+-- Debe retornar 1 fila (o más si hay empate)
+
+-- VERIFY 2: No debe haber productos con unidades_vendidas <= 0
+SELECT * FROM view_ranking_products WHERE unidades_vendidas <= 0;
+-- Debe retornar 0 filas
+
+-- VERIFY 3: Los rankings deben ser consecutivos y ordenados descendentemente
+SELECT lugar_ranking, unidades_vendidas 
+FROM view_ranking_products 
+ORDER BY lugar_ranking 
+LIMIT 5;
+-- Los valores de unidades_vendidas deben ir de mayor a menor
 
 
 
@@ -53,9 +64,17 @@ LEFT JOIN productos p ON c.id = p.categoria_id
 LEFT JOIN orden_detalles od ON p.id = od.producto_id
 GROUP BY c.id, c.nombre;
 
--- VERIFY
+-- VERIFY 1: El total debe coincidir con la suma de todas las ventas
 SELECT SUM(dinero_total) FROM view_sales_by_category;
--- El total de dinero aquí debe ser igual a la suma de todas las ventas registradas.
+-- Comparar con: SELECT SUM(subtotal) FROM orden_detalles;
+
+-- VERIFY 2: Todas las categorías deben aparecer, incluso sin ventas
+SELECT COUNT(*) FROM view_sales_by_category;
+-- Debe ser igual a: SELECT COUNT(*) FROM categorias;
+
+-- VERIFY 3: No debe haber valores NULL en dinero_total (gracias a COALESCE)
+SELECT * FROM view_sales_by_category WHERE dinero_total IS NULL;
+-- Debe retornar 0 filas
 
 
 -- REPORTE 3: Mejores Clientes
@@ -78,37 +97,58 @@ JOIN ordenes o ON u.id = o.usuario_id
 GROUP BY u.id, u.nombre, u.email
 HAVING SUM(o.total) > 500;
 
--- VERIFY
+-- VERIFY 1: Todos los clientes deben tener total_gastado > 500
 SELECT COUNT(*) FROM view_top_customers WHERE total_gastado <= 500;
--- El resultado debe ser 0 ya que todos deben haber gastado más de 500.
+-- Debe retornar 0
+
+-- VERIFY 2: El cliente con mayor gasto debe estar en la view
+SELECT cliente, total_gastado 
+FROM view_top_customers 
+ORDER BY total_gastado DESC 
+LIMIT 1;
+-- Verificar contra: SELECT u.nombre, SUM(o.total) FROM usuarios u JOIN ordenes o ON u.id = o.usuario_id GROUP BY u.nombre ORDER BY SUM(o.total) DESC LIMIT 1;
+
+-- VERIFY 3: Verificar que no falten clientes que cumplen la condición
+SELECT u.nombre, SUM(o.total) as total
+FROM usuarios u
+JOIN ordenes o ON u.id = o.usuario_id
+GROUP BY u.nombre
+HAVING SUM(o.total) > 500
+EXCEPT
+SELECT cliente, total_gastado FROM view_top_customers;
+-- Debe retornar 0 filas
 
 
 -- REPORTE 4: Estatus del Inventario
 -- VISTA: view_inventory_status
 -- Qué devuelve: Avisos sobre si hay productos por terminarse o agotados.
 -- Grain: Un producto por fila.
--- Métrica (s): COUNT(*), CASE(productos.stock)
+-- Métrica (s): stock (piezas_en_bodega), CASE para clasificar nivel de inventario
 -- Por qué GROUP BY / HAVING / subconsulta:
--- - GROUP BY para evaluar el stock individual de cada producto
 -- - CASE para generar etiquetas de texto según el nivel de piezas
+-- - No requiere GROUP BY ya que se evalúa directamente cada producto
 
 -- QUERY
 CREATE OR REPLACE VIEW view_inventory_status AS
 SELECT 
+    id AS producto_id,
     nombre AS producto,
     stock AS piezas_en_bodega,
     CASE 
         WHEN stock = 0 THEN 'Agotado'
         WHEN stock < 25 THEN 'Comprar pronto'
         ELSE 'Suficiente'
-    END AS aviso_estatus,
-    COUNT(*) AS total_conteo
+    END AS aviso_estatus
 FROM productos
-GROUP BY id, nombre, stock;
+ORDER BY stock ASC;
 
--- VERIFY
-SELECT * FROM view_inventory_status WHERE piezas_en_bodega = 0;
--- Los productos con 0 piezas deben tener el aviso 'Agotado'.
+-- VERIFY 1: Verificar que productos con stock 0 estén marcados como 'Agotado'
+SELECT * FROM view_inventory_status WHERE piezas_en_bodega = 0 AND aviso_estatus != 'Agotado';
+-- El resultado debe estar vacío (0 filas).
+
+-- VERIFY 2: Verificar que productos con stock < 25 estén marcados como 'Comprar pronto'
+SELECT * FROM view_inventory_status WHERE piezas_en_bodega > 0 AND piezas_en_bodega < 25 AND aviso_estatus != 'Comprar pronto';
+-- El resultado debe estar vacío (0 filas).
 
 -- REPORTE 5: Última Actividad
 -- VISTA: view_user_activity  
@@ -135,9 +175,27 @@ JOIN datos_recientes dr ON u.id = dr.usuario_id
 JOIN ordenes o ON u.id = o.usuario_id
 GROUP BY u.id, u.nombre, dr.dia_ultima_compra;
 
--- VERIFY
+-- VERIFY 1: Debe coincidir con usuarios que tienen órdenes
 SELECT COUNT(*) FROM view_user_activity;
--- El total debe coincidir con los usuarios que tienen al menos una orden.
+-- Comparar con: SELECT COUNT(DISTINCT usuario_id) FROM ordenes;
+
+-- VERIFY 2: La fecha de ultima_vez_visto debe ser la más reciente por usuario
+SELECT va.cliente, va.ultima_vez_visto, MAX(o.created_at)::date as max_fecha
+FROM view_user_activity va
+JOIN usuarios u ON va.cliente = u.nombre
+JOIN ordenes o ON u.id = o.usuario_id
+GROUP BY va.cliente, va.ultima_vez_visto
+HAVING va.ultima_vez_visto != MAX(o.created_at)::date;
+-- Debe retornar 0 filas
+
+-- VERIFY 3: El gasto_historico debe coincidir con la suma de todas las órdenes del usuario
+SELECT va.cliente, va.gasto_historico, SUM(o.total) as total_real
+FROM view_user_activity va
+JOIN usuarios u ON va.cliente = u.nombre
+JOIN ordenes o ON u.id = o.usuario_id
+GROUP BY va.cliente, va.gasto_historico
+HAVING va.gasto_historico != SUM(o.total);
+-- Debe retornar 0 filas
 
 
 -- REPORTE 6: Resumen de Pedidos
@@ -158,9 +216,17 @@ SELECT
 FROM ordenes
 GROUP BY status;
 
--- VERIFY
+-- VERIFY 1: La suma de porcentajes debe ser 100 (o muy cercana)
 SELECT SUM(porcentaje) FROM view_order_summary;
--- La suma total de los porcentajes debe ser cercana a 100.
+-- Debe retornar 100.00 o muy cercano
+
+-- VERIFY 2: La suma de total_pedidos debe coincidir con el total de órdenes
+SELECT SUM(total_pedidos) FROM view_order_summary;
+-- Comparar con: SELECT COUNT(*) FROM ordenes;
+
+-- VERIFY 3: Cada estado debe tener al menos 1 pedido
+SELECT * FROM view_order_summary WHERE total_pedidos = 0;
+-- Debería retornar 0 filas (o revisar si hay estados sin órdenes)
 
 
 -- REPORTE 7: Ventas Diarias
@@ -181,6 +247,24 @@ SELECT
 FROM ordenes
 GROUP BY created_at::date;
 
--- VERIFY
+-- VERIFY 1: La suma de todos los días debe coincidir con el total de ventas
 SELECT SUM(dinero_del_dia) FROM view_daily_sales;
--- La suma de todos los días debe ser igual al total de ventas.
+-- Comparar con: SELECT SUM(total) FROM ordenes;
+
+-- VERIFY 2: La suma de numero_de_ventas debe coincidir con total de órdenes
+SELECT SUM(numero_de_ventas) FROM view_daily_sales;
+-- Comparar con: SELECT COUNT(*) FROM ordenes;
+
+-- VERIFY 3: No debe haber fechas duplicadas
+SELECT fecha, COUNT(*) 
+FROM view_daily_sales 
+GROUP BY fecha 
+HAVING COUNT(*) > 1;
+-- Debe retornar 0 filas
+
+-- VERIFY 4: Mostrar el día con más ventas
+SELECT fecha, numero_de_ventas, dinero_del_dia 
+FROM view_daily_sales 
+ORDER BY dinero_del_dia DESC 
+LIMIT 1;
+-- Verificar que sea el día con mayores ingresos
