@@ -2,7 +2,10 @@ import { query } from '@/lib/db';
 import DataTable from '@/components/DataTable';
 import KPICard from '@/components/KPICard';
 import PaginationButtons from '@/components/PaginationButtons';
+import SearchFilter from '@/components/SearchFilter';
+import StatusFilter from '@/components/StatusFilter';
 import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination';
+import { InventoryStatusSchema } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,15 +16,43 @@ export default async function InventoryPage({
 }) {
   const limit = 7;
   const resolvedSearchParams = await searchParams;
+  
+  // Validar con Zod
+  const validated = InventoryStatusSchema.safeParse(resolvedSearchParams);
+  const filters = validated.success ? validated.data : {};
+  
   const pagination = getPaginationParams(resolvedSearchParams);
   const { offset } = getPaginationOffsetLimit(pagination.page, limit);
   
-  const totalRes = await query('SELECT COUNT(*) as count FROM view_inventory_status');
+  // Construir WHERE clause dinámico
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
+  
+  if (filters.status) {
+    conditions.push(`aviso_estatus = $${paramIndex}`);
+    params.push(filters.status);
+    paramIndex++;
+  }
+  
+  if (filters.query) {
+    conditions.push(`producto ILIKE $${paramIndex}`);
+    params.push(`%${filters.query}%`);
+    paramIndex++;
+  }
+  
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  
+  // Query con filtros
+  const totalRes = await query(
+    `SELECT COUNT(*) as count FROM view_inventory_status ${whereClause}`,
+    params
+  );
   const total = parseInt(totalRes.rows[0].count, 10);
   
   const res = await query(
-    'SELECT * FROM view_inventory_status ORDER BY piezas_en_bodega ASC LIMIT $1 OFFSET $2',
-    [limit, offset]
+    `SELECT * FROM view_inventory_status ${whereClause} ORDER BY piezas_en_bodega ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+    [...params, limit, offset]
   );
   
   const data = res.rows.map((row: any) => ({
@@ -30,7 +61,7 @@ export default async function InventoryPage({
     'Aviso Estatus': row.aviso_estatus
   }));
 
-  const allRes = await query('SELECT * FROM view_inventory_status');
+  const allRes = await query(`SELECT * FROM view_inventory_status ${whereClause}`, params);
   const agotados = allRes.rows.filter((row: any) => row.aviso_estatus === 'Agotado').length;
   const comprarPronto = allRes.rows.filter((row: any) => row.aviso_estatus === 'Comprar pronto').length;
   const totalProductos = allRes.rows.length;
@@ -48,6 +79,11 @@ export default async function InventoryPage({
         { label: 'Comprar Pronto', value: comprarPronto },
         { label: 'Total Productos', value: totalProductos }
       ]} />
+
+      <div className="flex gap-2 mb-4">
+        <SearchFilter placeholder="Buscar producto..." />
+        <StatusFilter options={['Agotado', 'Comprar pronto', 'Suficiente']} />
+      </div>
 
       <DataTable title="" columns={['Producto', 'Piezas en Bodega', 'Aviso Estatus']} data={data} />
       <PaginationButtons page={pagination.page} totalPages={totalPages} limit={limit} />

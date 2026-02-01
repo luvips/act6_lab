@@ -2,7 +2,9 @@ import { query } from '@/lib/db';
 import DataTable from '@/components/DataTable';
 import KPICard from '@/components/KPICard';
 import PaginationButtons from '@/components/PaginationButtons';
+import SearchFilter from '@/components/SearchFilter';
 import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination';
+import { SearchSchema } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,15 +15,26 @@ export default async function TopCustomersPage({
 }) {
   const limit = 7;
   const resolvedSearchParams = await searchParams;
+  
+  const validated = SearchSchema.safeParse(resolvedSearchParams);
+  const filters = validated.success ? validated.data : {};
+  
   const pagination = getPaginationParams(resolvedSearchParams);
   const { offset } = getPaginationOffsetLimit(pagination.page, limit);
   
-  const totalRes = await query('SELECT COUNT(*) as count FROM view_top_customers');
+  const whereClause = filters.query ? `WHERE cliente ILIKE $1` : '';
+  const params: any[] = filters.query ? [`%${filters.query}%`] : [];
+  const paramIndex = params.length + 1;
+  
+  const totalRes = await query(
+    `SELECT COUNT(*) as count FROM view_top_customers ${whereClause}`,
+    params
+  );
   const total = parseInt(totalRes.rows[0].count, 10);
   
   const res = await query(
-    'SELECT * FROM view_top_customers ORDER BY total_gastado DESC LIMIT $1 OFFSET $2',
-    [limit, offset]
+    `SELECT * FROM view_top_customers ${whereClause} ORDER BY total_gastado DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+    [...params, limit, offset]
   );
   
   const data = res.rows.map((row: any) => ({
@@ -30,7 +43,10 @@ export default async function TopCustomersPage({
     'Total Gastado': `$${Number(row.total_gastado).toFixed(2)}`
   }));
 
-  const allRes = await query('SELECT * FROM view_top_customers ORDER BY total_gastado DESC');
+  const allRes = await query(
+    `SELECT * FROM view_top_customers ${whereClause} ORDER BY total_gastado DESC`,
+    params
+  );
   const totalClientes = allRes.rows.length;
   const totalGastado = allRes.rows.reduce((sum: number, row: any) => sum + Number(row.total_gastado), 0);
   const promedioGasto = allRes.rows.length > 0 ? totalGastado / allRes.rows.length : 0;
@@ -48,6 +64,10 @@ export default async function TopCustomersPage({
         { label: 'Gasto Promedio', value: `$${promedioGasto.toFixed(0)}` },
         { label: 'Total Gastado', value: `$${totalGastado.toFixed(0)}` }
       ]} />
+
+      <div className="flex gap-2 mb-4">
+        <SearchFilter placeholder="Buscar cliente..." />
+      </div>
 
       <DataTable title="" columns={['Cliente', 'Correo', 'Total Gastado']} data={data} />
       <PaginationButtons page={pagination.page} totalPages={totalPages} limit={limit} />

@@ -2,7 +2,9 @@ import { query } from '@/lib/db';
 import DataTable from '@/components/DataTable';
 import KPICard from '@/components/KPICard';
 import PaginationButtons from '@/components/PaginationButtons';
+import SearchFilter from '@/components/SearchFilter';
 import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination';
+import { SearchSchema } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,15 +15,26 @@ export default async function CategoriesPage({
 }) {
   const limit = 7;
   const resolvedSearchParams = await searchParams;
+  
+  const validated = SearchSchema.safeParse(resolvedSearchParams);
+  const filters = validated.success ? validated.data : {};
+  
   const pagination = getPaginationParams(resolvedSearchParams);
   const { offset } = getPaginationOffsetLimit(pagination.page, limit);
   
-  const totalRes = await query('SELECT COUNT(*) as count FROM view_sales_by_category');
+  const whereClause = filters.query ? `WHERE categoria ILIKE $1` : '';
+  const params: any[] = filters.query ? [`%${filters.query}%`] : [];
+  const paramIndex = params.length + 1;
+  
+  const totalRes = await query(
+    `SELECT COUNT(*) as count FROM view_sales_by_category ${whereClause}`,
+    params
+  );
   const total = parseInt(totalRes.rows[0].count, 10);
   
   const res = await query(
-    'SELECT * FROM view_sales_by_category ORDER BY dinero_total DESC LIMIT $1 OFFSET $2',
-    [limit, offset]
+    `SELECT * FROM view_sales_by_category ${whereClause} ORDER BY dinero_total DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+    [...params, limit, offset]
   );
   
   const data = res.rows.map((row: any) => ({
@@ -30,7 +43,10 @@ export default async function CategoriesPage({
     'Dinero Total': `$${Number(row.dinero_total).toFixed(2)}`
   }));
 
-  const allRes = await query('SELECT * FROM view_sales_by_category ORDER BY dinero_total DESC');
+  const allRes = await query(
+    `SELECT * FROM view_sales_by_category ${whereClause} ORDER BY dinero_total DESC`,
+    params
+  );
   const totalVentas = allRes.rows.reduce((sum: number, row: any) => sum + Number(row.dinero_total), 0);
   const topCategoria = allRes.rows[0];
   const porcentajeTop = ((Number(topCategoria?.dinero_total) / totalVentas) * 100).toFixed(1);
@@ -47,6 +63,10 @@ export default async function CategoriesPage({
         { label: 'Ingresos Totales', value: `$${totalVentas.toLocaleString()}` },
         { label: 'Categoría Top', value: topCategoria?.categoria, subtitle: `${porcentajeTop}% del total` }
       ]} />
+
+      <div className="flex gap-2 mb-4">
+        <SearchFilter placeholder="Buscar categoría..." />
+      </div>
 
       <DataTable title="" columns={['Categoria', 'Productos Distintos', 'Dinero Total']} data={data} />
       <PaginationButtons page={pagination.page} totalPages={totalPages} limit={limit} />
