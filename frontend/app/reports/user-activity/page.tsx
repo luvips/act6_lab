@@ -1,11 +1,23 @@
 import { query } from '@/lib/db';
 import DataTable from '@/components/DataTable';
 import KPICard from '@/components/KPICard';
+import PaginationButtons from '@/components/PaginationButtons';
+import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
 
-export default async function UserActivityPage() {
-  const res = await query('SELECT * FROM view_user_activity ORDER BY ultima_vez_visto DESC');
+export default async function UserActivityPage({ searchParams }: { searchParams: Record<string, string> }) {
+  const limit = 7;
+  const pagination = getPaginationParams(searchParams);
+  const { offset } = getPaginationOffsetLimit(pagination.page, limit);
+  
+  const totalRes = await query('SELECT COUNT(*) as count FROM view_user_activity');
+  const total = parseInt(totalRes.rows[0].count, 10);
+  
+  const res = await query(
+    'SELECT * FROM view_user_activity ORDER BY ultima_vez_visto DESC LIMIT $1 OFFSET $2',
+    [limit, offset]
+  );
   
   const data = res.rows.map((row: any) => ({
     'Cliente': row.cliente,
@@ -13,9 +25,11 @@ export default async function UserActivityPage() {
     'Gasto Historico': `$${Number(row.gasto_historico).toFixed(2)}`
   }));
 
-  const totalClientes = res.rows.length;
-  const promedioGasto = res.rows.reduce((sum: number, row: any) => sum + Number(row.gasto_historico), 0) / totalClientes;
-  const clienteMasReciente = res.rows[0];
+  const allRes = await query('SELECT * FROM view_user_activity ORDER BY ultima_vez_visto DESC');
+  const totalClientes = allRes.rows.length;
+  const promedioGasto = allRes.rows.length > 0 ? allRes.rows.reduce((sum: number, row: any) => sum + Number(row.gasto_historico), 0) / allRes.rows.length : 0;
+  const clienteMasReciente = allRes.rows[0];
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="p-10 bg-white min-h-screen">
@@ -31,6 +45,7 @@ export default async function UserActivityPage() {
       ]} />
 
       <DataTable title="" columns={['Cliente', 'Ultima Vez Visto', 'Gasto Historico']} data={data} />
+      <PaginationButtons page={pagination.page} totalPages={totalPages} limit={limit} />
     </div>
   );
 }

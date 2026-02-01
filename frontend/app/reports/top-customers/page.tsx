@@ -1,11 +1,23 @@
 import { query } from '@/lib/db';
 import DataTable from '@/components/DataTable';
 import KPICard from '@/components/KPICard';
+import PaginationButtons from '@/components/PaginationButtons';
+import { getPaginationParams, getPaginationOffsetLimit } from '@/lib/pagination';
 
 export const dynamic = 'force-dynamic';
 
-export default async function TopCustomersPage() {
-  const res = await query('SELECT * FROM view_top_customers ORDER BY total_gastado DESC');
+export default async function TopCustomersPage({ searchParams }: { searchParams: Record<string, string> }) {
+  const limit = 7;
+  const pagination = getPaginationParams(searchParams);
+  const { offset } = getPaginationOffsetLimit(pagination.page, limit);
+  
+  const totalRes = await query('SELECT COUNT(*) as count FROM view_top_customers');
+  const total = parseInt(totalRes.rows[0].count, 10);
+  
+  const res = await query(
+    'SELECT * FROM view_top_customers ORDER BY total_gastado DESC LIMIT $1 OFFSET $2',
+    [limit, offset]
+  );
   
   const data = res.rows.map((row: any) => ({
     'Cliente': row.cliente,
@@ -13,9 +25,11 @@ export default async function TopCustomersPage() {
     'Total Gastado': `$${Number(row.total_gastado).toFixed(2)}`
   }));
 
-  const totalClientes = res.rows.length;
-  const totalGastado = res.rows.reduce((sum: number, row: any) => sum + Number(row.total_gastado), 0);
-  const promedioGasto = totalGastado / totalClientes;
+  const allRes = await query('SELECT * FROM view_top_customers ORDER BY total_gastado DESC');
+  const totalClientes = allRes.rows.length;
+  const totalGastado = allRes.rows.reduce((sum: number, row: any) => sum + Number(row.total_gastado), 0);
+  const promedioGasto = allRes.rows.length > 0 ? totalGastado / allRes.rows.length : 0;
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="p-10 bg-white min-h-screen">
@@ -31,6 +45,7 @@ export default async function TopCustomersPage() {
       ]} />
 
       <DataTable title="" columns={['Cliente', 'Correo', 'Total Gastado']} data={data} />
+      <PaginationButtons page={pagination.page} totalPages={totalPages} limit={limit} />
     </div>
   );
 }
