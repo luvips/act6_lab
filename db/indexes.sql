@@ -1,20 +1,19 @@
--- ============================================================
--- Luvia Magali Hidalgo García 243732
--- Tarea 6: Lab Reportes: Next.js ReportsDashboard
--- Archivo: db/indexes.sql
--- ============================================================
+-- Índices para acelerar joins, filtros y ordenamientos de las views
 
--- INDICE 1: Optimización de Categorías
+-- idx_productos_categoria: JOIN por categoria_id
 CREATE INDEX idx_productos_categoria ON productos(categoria_id);
 
--- INDICE 2: Optimización de Clientes
+-- idx_ordenes_usuario: JOIN y GROUP BY por usuario_id
 CREATE INDEX idx_ordenes_usuario ON ordenes(usuario_id);
 
--- INDICE 3: Optimización de Inventario
+-- idx_productos_stock: ORDER BY stock
 CREATE INDEX idx_productos_stock ON productos(stock);
 
--- INDICE 4: Optimización de Fechas
+-- idx_ordenes_fecha: GROUP BY fecha
 CREATE INDEX idx_ordenes_fecha ON ordenes(created_at);
 
--- Verificación de índices creados
-SELECT indexname, tablename FROM pg_indexes WHERE schemaname = 'public';
+-- Verificación
+SELECT indexname, tablename, indexdef 
+FROM pg_indexes 
+WHERE schemaname = 'public' 
+ORDER BY tablename, indexname;
