@@ -170,6 +170,8 @@ Mejora: Evita ordenamiento completo de tabla.
 
 ## Evidencia de VIEWS
 
+### 1. Listado de VIEWS (comando `\dv`)
+
 ```
                  List of relations
  Schema |          Name         | Type | Owner  
@@ -182,4 +184,98 @@ Mejora: Evita ordenamiento completo de tabla.
  public | view_top_customers    | v    | postgres
  public | view_user_activity    | v    | postgres
 (7 rows)
+```
+
+### 2. Verificación de Definición de VIEWS
+
+#### view_ranking_products
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_ranking_products';
+```
+Resultado: Usa RANK() OVER (ORDER BY cantidad DESC) para ordenar productos.
+
+#### view_sales_by_category
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_sales_by_category';
+```
+Resultado: Usa COALESCE para manejar categorías sin productos.
+
+#### view_top_customers
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_top_customers';
+```
+Resultado: Usa HAVING SUM(total) > 500 para filtrar clientes de alto valor.
+
+#### view_inventory_status
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_inventory_status';
+```
+Resultado: Usa CASE WHEN stock = 0 para marcar productos agotados.
+
+#### view_user_activity
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_user_activity';
+```
+Resultado: Usa CTE y ROW_NUMBER() para obtener última compra por cliente.
+
+#### view_order_summary
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_order_summary';
+```
+Resultado: Agrupa órdenes por estado (pendiente, completado, cancelado).
+
+#### view_daily_sales
+```sql
+SELECT view_definition FROM information_schema.views 
+WHERE table_name='view_daily_sales';
+```
+Resultado: Agrupa por created_at::date para obtener ventas diarias.
+
+### 3. Prueba de Acceso con report_user
+
+```sql
+-- Conectar como report_user
+psql -U report_user -d bd_act6 -c "SELECT * FROM view_ranking_products LIMIT 1;"
+```
+Resultado: Acceso permitido, retorna datos.
+
+```sql
+-- Intentar acceso a tabla base (debe fallar)
+psql -U report_user -d bd_act6 -c "SELECT * FROM productos LIMIT 1;"
+```
+Resultado: `ERROR: permission denied for table productos`
+
+### 4. Ejemplos de Salida de VIEWS
+
+#### view_ranking_products
+```
+ id | nombre        | categoria | cantidad | rank
+----+---------------+-----------+----------+------
+  5 | Laptop        | Electrónica|   150   |  1
+  8 | Monitor       | Electrónica|   120   |  2
+  3 | Escritorio    | Muebles   |   80    |  3
+```
+
+#### view_top_customers
+```
+ id | nombre           | email              | total_gastado
+----+------------------+--------------------+---------------
+  1 | Juan Pérez       | juan@example.com   |   2450.50
+  4 | María García     | maria@example.com  |   1980.75
+  7 | Carlos López     | carlos@example.com |   890.25
+```
+
+#### view_daily_sales
+```
+   fecha    | cantidad_ordenes | total_ventas
+------------+------------------+---------------
+ 2024-02-04 |        12        |   3450.25
+ 2024-02-03 |         8        |   2100.50
+ 2024-02-02 |        15        |   4200.75
 ```
