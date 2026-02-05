@@ -1,12 +1,48 @@
-# Justificación de Índices - Tarea 6: Lab Reportes
+# Tarea 6: Lab Reportes
 
-Estudiante: Luvia Magali Hidalgo García (243732)
+**Estudiante:** Luvia Magali Hidalgo García (243732)
 
-## Objetivo
+## Resumen
+Aplicación en Next.js que muestra 7 reportes desde VIEWS en PostgreSQL. Todo se levanta con Docker Compose.
 
-La rúbrica pide mínimo 3 índices. En este proyecto se crearon 4. La idea es que las consultas de los reportes respondan más rápido y no tengan que recorrer toda la tabla cada vez.
+## Cómo ejecutar
+1. Copia el archivo de ejemplo:
+   - `cp .env.example .env`
+2. Edita `.env` con tus contraseñas.
+3. Levanta todo:
+   - `docker compose up --build`
+4. Abre:
+   - App: http://localhost:3000
+   - DB: localhost:5433
 
----
+## Reportes (VIEWS)
+- `view_ranking_products`: productos más vendidos.
+- `view_sales_by_category`: ventas por categoría.
+- `view_top_customers`: clientes con gasto alto.
+- `view_inventory_status`: estado del inventario.
+- `view_user_activity`: última actividad por cliente.
+- `view_order_summary`: distribución por estado.
+- `view_daily_sales`: ventas por día.
+
+## Seguridad
+- Credenciales en `.env`, no en el código.
+- Usuario `report_user` con permisos solo de lectura en VIEWS.
+- Consultas con parámetros y validación en el servidor.
+
+## Evidencia
+- Lista de views (`\dv`).
+- Dos `EXPLAIN ANALYZE` guardados (captura o texto).
+- Evidencia de permisos del usuario `report_user`.
+
+## Trade-offs (simple)
+- Cálculos en SQL para no mover muchos datos al frontend.
+- Paginación en la base para evitar cargar todo.
+
+## Bitácora de IA
+- Se usó IA para:
+  - Revisar requisitos.
+  - Estructurar README.
+  - Verificar seguridad mínima.
 
 ## Índice 1: idx_productos_categoria
 
