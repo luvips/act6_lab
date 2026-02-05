@@ -25,4 +25,9 @@ GRANT SELECT ON view_top_customers TO report_user;
 GRANT SELECT ON view_inventory_status TO report_user;
 GRANT SELECT ON view_user_activity TO report_user;
 GRANT SELECT ON view_order_summary TO report_user;
+<<<<<<< HEAD
 GRANT SELECT ON view_daily_sales TO report_user;
+=======
+GRANT SELECT ON view_daily_sales TO report_user;
+SELECT rolname FROM pg_roles WHERE rolname = 'report_user';
+>>>>>>> 6032da854a65465d91520a257d9ccf192c25cc74
