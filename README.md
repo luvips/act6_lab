@@ -279,3 +279,42 @@ Resultado: `ERROR: permission denied for table productos`
  2024-02-03 |         8        |   2100.50
  2024-02-02 |        15        |   4200.75
 ```
+
+#### view_inventory_status
+```
+ id | nombre        | stock | estado
+----+---------------+-------+----------
+  1 | Teclado       |   0   | Agotado
+  2 | Mouse         |   45  | Suficiente
+  3 | Monitor       |   8   | Suficiente
+  4 | Escritorio    |   0   | Agotado
+  5 | Silla         |   23  | Suficiente
+```
+
+#### view_sales_by_category
+```
+ categoria    | total_ventas | cantidad_productos
+--------------+--------------+-------------------
+ Electrónica  |   15450.25   |        12
+ Muebles      |    8900.50   |         8
+ Accesorios   |    3200.75   |        15
+```
+
+#### view_order_summary
+```
+ estado     | cantidad | total_monto
+------------+----------+-------------
+ Completado |    145   |  45230.50
+ Pendiente  |     23   |   8920.75
+ Cancelado  |      8   |   2100.25
+```
+
+#### view_user_activity
+```
+ usuario_id | nombre        | email               | ultima_compra | dias_sin_comprar
+------------+---------------+---------------------+---------------+------------------
+     1      | Juan Pérez    | juan@example.com    |  2024-02-04   |        0
+     2      | María García  | maria@example.com   |  2024-02-01   |        3
+     3      | Carlos López  | carlos@example.com  |  2024-01-25   |       10
+     4      | Ana Rodríguez | ana@example.com     |  2024-02-03   |        1
+```
