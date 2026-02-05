@@ -4,19 +4,21 @@
 -- Archivo: db/roles.sql
 -- ============================================
 
--- Crear el usuario para la conexión de la app
-CREATE ROLE report_user WITH LOGIN PASSWORD 'password123';
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'report_user') THEN
+		CREATE ROLE report_user WITH LOGIN PASSWORD 'report_user_pass';
+	END IF;
+END
+$$;
 
--- Conectar a la base de datos correcta
 GRANT CONNECT ON DATABASE actividad_db TO report_user;
-
--- Dar acceso al schema public
 GRANT USAGE ON SCHEMA public TO report_user;
 
--- Revocar acceso a tablas base (solo permitir views)
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM report_user;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM report_user;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM report_user;
 
--- Permisos SELECT solo sobre las VIEWS
 GRANT SELECT ON view_ranking_products TO report_user;
 GRANT SELECT ON view_sales_by_category TO report_user;
 GRANT SELECT ON view_top_customers TO report_user;
@@ -24,5 +26,3 @@ GRANT SELECT ON view_inventory_status TO report_user;
 GRANT SELECT ON view_user_activity TO report_user;
 GRANT SELECT ON view_order_summary TO report_user;
 GRANT SELECT ON view_daily_sales TO report_user;
-
-SELECT rolname FROM pg_roles WHERE rolname = 'report_user';
