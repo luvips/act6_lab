@@ -6,6 +6,8 @@
 -- Dominio: [Describir el dominio modelado]
 -- ============================================
 
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
 -- Limpiar tablas si existen (útil para desarrollo)
 -- CUIDADO: Esto borra todos los datos
 DROP TABLE IF EXISTS tabla_relacion CASCADE;

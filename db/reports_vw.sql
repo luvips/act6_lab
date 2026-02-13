@@ -15,13 +15,18 @@
 -- - GROUP BY para agregar por producto
 -- - HAVING para filtrar productos que no tienen ventas
 -- - Window Function (RANK) para construir el Top
+-- - Campo calculado: porcentaje_ventas
 
 -- QUERY
 CREATE OR REPLACE VIEW view_ranking_products AS
 SELECT 
     p.nombre AS producto,
     SUM(od.cantidad) AS unidades_vendidas,
-    RANK() OVER (ORDER BY SUM(od.cantidad) DESC) AS lugar_ranking
+    RANK() OVER (ORDER BY SUM(od.cantidad) DESC) AS lugar_ranking,
+    ROUND(
+        (SUM(od.cantidad) / NULLIF(SUM(SUM(od.cantidad)) OVER (), 0)) * 100,
+        2
+    ) AS porcentaje_ventas
 FROM productos p
 JOIN orden_detalles od ON p.id = od.producto_id
 GROUP BY p.id, p.nombre
@@ -81,17 +86,20 @@ SELECT * FROM view_sales_by_category WHERE dinero_total IS NULL;
 -- VISTA: view_top_customers
 -- Qué devuelve: Personas que han gastado más de $500 en total.
 -- Grain: Un cliente por fila.
--- Métrica (s): SUM(ordenes.total)
+-- Métrica (s): SUM(ordenes.total), COUNT(ordenes.id)
 -- Por qué GROUP BY / HAVING / subconsulta:
 -- - GROUP BY para sumar el gasto por cada cliente
 -- - HAVING para filtrar solo clientes de alto valor (>$500)
+-- - Campo calculado: ticket_promedio (ratio)
 
 -- QUERY
 CREATE OR REPLACE VIEW view_top_customers AS
 SELECT 
     u.nombre AS cliente,
     u.email AS correo,
-    SUM(o.total) AS total_gastado
+    SUM(o.total) AS total_gastado,
+    COUNT(o.id) AS total_ordenes,
+    ROUND(SUM(o.total) / NULLIF(COUNT(o.id), 0), 2) AS ticket_promedio
 FROM usuarios u
 JOIN ordenes o ON u.id = o.usuario_id
 GROUP BY u.id, u.nombre, u.email
@@ -123,24 +131,31 @@ SELECT cliente, total_gastado FROM view_top_customers;
 -- VISTA: view_inventory_status
 -- Qué devuelve: Avisos sobre si hay productos por terminarse o agotados.
 -- Grain: Un producto por fila.
--- Métrica (s): stock (piezas_en_bodega), CASE para clasificar nivel de inventario
+-- Métrica (s): SUM(stock) (piezas_en_bodega), CASE para clasificar nivel de inventario
 -- Por qué GROUP BY / HAVING / subconsulta:
+-- - GROUP BY para agregar por producto
 -- - CASE para generar etiquetas de texto según el nivel de piezas
--- - No requiere GROUP BY ya que se evalúa directamente cada producto
+-- - Campo calculado: ratio_vs_promedio (comparacion con promedio global)
 
 -- QUERY
 CREATE OR REPLACE VIEW view_inventory_status AS
+WITH stock_stats AS (
+    SELECT AVG(stock) AS promedio_stock
+    FROM productos
+)
 SELECT 
-    id AS producto_id,
-    nombre AS producto,
-    stock AS piezas_en_bodega,
+    p.id AS producto_id,
+    p.nombre AS producto,
+    SUM(p.stock) AS piezas_en_bodega,
     CASE 
-        WHEN stock = 0 THEN 'Agotado'
-        WHEN stock < 25 THEN 'Comprar pronto'
+        WHEN SUM(p.stock) = 0 THEN 'Agotado'
+        WHEN SUM(p.stock) < 25 THEN 'Comprar pronto'
         ELSE 'Suficiente'
-    END AS aviso_estatus
-FROM productos
-ORDER BY stock ASC;
+    END AS aviso_estatus,
+    ROUND(SUM(p.stock) / NULLIF(stock_stats.promedio_stock, 0), 2) AS ratio_vs_promedio
+FROM productos p
+CROSS JOIN stock_stats
+GROUP BY p.id, p.nombre, stock_stats.promedio_stock;
 
 -- VERIFY 1: Verificar que productos con stock 0 estén marcados como 'Agotado'
 SELECT * FROM view_inventory_status WHERE piezas_en_bodega = 0 AND aviso_estatus != 'Agotado';
@@ -158,6 +173,7 @@ SELECT * FROM view_inventory_status WHERE piezas_en_bodega > 0 AND piezas_en_bod
 -- Por qué GROUP BY / HAVING / subconsulta:
 -- - CTE (WITH) para precalcular la fecha más reciente de compra
 -- - GROUP BY para consolidar el historial total de cada usuario
+-- - Campo calculado: segmento_actividad (CASE)
 
 -- QUERY
 CREATE OR REPLACE VIEW view_user_activity AS
@@ -169,7 +185,12 @@ WITH datos_recientes AS (
 SELECT 
     u.nombre AS cliente,
     dr.dia_ultima_compra::date AS ultima_vez_visto,
-    SUM(o.total) AS gasto_historico
+    SUM(o.total) AS gasto_historico,
+    CASE
+        WHEN dr.dia_ultima_compra::date >= (CURRENT_DATE - INTERVAL '30 days') THEN 'Reciente'
+        WHEN dr.dia_ultima_compra::date >= (CURRENT_DATE - INTERVAL '90 days') THEN 'Latente'
+        ELSE 'Inactivo'
+    END AS segmento_actividad
 FROM usuarios u
 JOIN datos_recientes dr ON u.id = dr.usuario_id
 JOIN ordenes o ON u.id = o.usuario_id
@@ -237,13 +258,15 @@ SELECT * FROM view_order_summary WHERE total_pedidos = 0;
 -- Por qué GROUP BY / HAVING / subconsulta:
 -- - GROUP BY para agregar las ventas según el calendario
 -- - CAST (::date) para agrupar las órdenes por día sin importar la hora
+-- - Campo calculado: ticket_promedio (ratio)
 
 -- QUERY
 CREATE OR REPLACE VIEW view_daily_sales AS
 SELECT 
     created_at::date AS fecha,
     COUNT(id) AS numero_de_ventas,
-    SUM(total) AS dinero_del_dia
+    SUM(total) AS dinero_del_dia,
+    ROUND(SUM(total) / NULLIF(COUNT(id), 0), 2) AS ticket_promedio
 FROM ordenes
 GROUP BY created_at::date;
 
