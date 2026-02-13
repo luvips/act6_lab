@@ -8,20 +8,26 @@ Dashboard en Next.js que muestra 7 reportes desde VIEWS en PostgreSQL. La aplica
 
 ## Cómo Ejecutar
 
-1. Copia el archivo de ejemplo:
+1. Clona el repositorio:
+  ```bash
+  git clone https://github.com/luvips/act6_lab.git
+  cd act6_lab
+  ```
+
+2. Copia el archivo de ejemplo:
    ```bash
    cp .env.example .env
    ```
 
-2. Edita `.env` con tus contraseñas.
+3. En Classroom se entregara un archivo `.en.txt`. Copia su contenido y pegalo en tu `.env`.
 
-3. Levanta todo:
+4. Levanta todo:
    ```bash
    docker compose up --build
    ```
 
-4. Accede a:
-   - App: http://localhost:3000
+5. Accede a:
+  - Web: http://localhost:3000
    - BD: localhost:5433
 
 ## VIEWS SQL (Reportes)
@@ -125,12 +131,10 @@ Resultado esperado: `Index Scan using idx_ordenes_fecha en el plan de ejecución
 
 ## Trade-offs (SQL vs Next.js)
 
-| Decisión | Por qué |
-|----------|---------|
-| Cálculos en SQL | SI: Una query, menos datos en tránsito |
-| Paginación en BD (LIMIT/OFFSET) | SI: BD retorna solo las filas necesarias |
-| Validación Zod antes de SQL | SI: Previene SQL injection |
-| Server Components para queries | SI: Credenciales nunca en cliente |
+- Calculos en SQL para KPIs y agregados: reduce datos transferidos y asegura consistencia.
+- Paginacion en BD (LIMIT/OFFSET): evita traer todo el dataset al servidor.
+- Validacion Zod en server: evita entradas invalidas antes de ejecutar SQL.
+- Server Components/Server Actions: credenciales nunca llegan al cliente.
 
 ## Performance Evidence (EXPLAIN ANALYZE)
 
@@ -139,7 +143,7 @@ Resultado esperado: `Index Scan using idx_ordenes_fecha en el plan de ejecución
 Index Scan using idx_ordenes_usuario on ordenes (cost=0.42..4.44 rows=10)
   Index Cond: (usuario_id = 5)
 ```
-Mejora: ~8x más rápido comparado con Full Table Scan.
+Mejora: El plan evita escanear toda la tabla y se siente mas fluido al filtrar por usuario.
 
 ### Query 2: view_daily_sales (con índice)
 ```
@@ -150,13 +154,11 @@ Mejora: Evita ordenamiento completo de tabla.
 
 ## Threat Model (Seguridad)
 
-| Amenaza | Mitigación |
-|---------|-----------|
-| SQL Injection | NO: Parámetros preparados ($1, $2) + validación Zod |
-| Credenciales expuestas | NO: Variables de entorno, .env en .gitignore |
-| Usuario con permisos excesivos | NO: Rol report_user solo SELECT en VIEWS |
-| Acceso a tablas base | NO: REVOKE ALL en tablas, GRANT solo en VIEWS |
-| Datos sensibles en logs | NO: Credenciales solo en .env |
+- SQL injection: parametros preparados ($1, $2) y validacion Zod.
+- Credenciales expuestas: variables de entorno, sin credenciales en cliente.
+- Permisos minimos: rol de app solo SELECT en VIEWS.
+- Acceso a tablas base: REVOKE ALL en tablas, GRANT solo a VIEWS.
+- Datos sensibles en logs: no se imprimen secretos.
 
 ## Bitácora de IA
 
@@ -164,7 +166,7 @@ Mejora: Evita ordenamiento completo de tabla.
 |--------|-----------|-----------|
 | "Cómo hacer VIEWS con GROUP BY y HAVING en PostgreSQL" | Las 7 queries ejecutadas sin errores, grain correcto, métricas calculadas. | Agregué COALESCE en view_sales_by_category para manejar NULL. |
 | "Cómo conectar Next.js a PostgreSQL sin exponer credenciales" | Que las queries usen parámetros ($1, $2) y no concatenación de strings. | Moví credenciales a variables de entorno en .env. |
-| "Estructura de docker-compose.yml con BD y app Next.js" | Que el servicio web dependa de db con healthcheck, que se ejecute todo con un comando. | Agregué POSTGRES_PASSWORD y DB_APP_PASSWORD como variables de entorno. |
+| "Estructura de docker-compose.yml con BD y web Next.js" | Que el servicio web dependa de db con healthcheck, que se ejecute todo con un comando. | Agregué POSTGRES_PASSWORD y DB_APP_PASSWORD como variables de entorno. |
 | "Cómo hacer paginación en Next.js desde la BD" | Que LIMIT y OFFSET funcionen correctamente en las queries, que no traiga todas las filas. | Validé que cada reporte use offset = (page - 1) * limit. |
 | "Permisos mínimos para usuario de PostgreSQL" | Que report_user tenga CONNECT, USAGE en schema, pero NO acceso a tablas base. | Agregué REVOKE ALL en TABLES y SEQUENCES antes de GRANT SELECT en VIEWS. |
 
@@ -221,7 +223,7 @@ Resultado: Usa CASE WHEN stock = 0 para marcar productos agotados.
 SELECT view_definition FROM information_schema.views 
 WHERE table_name='view_user_activity';
 ```
-Resultado: Usa CTE y ROW_NUMBER() para obtener última compra por cliente.
+Resultado: Usa CTE para la fecha de ultima compra y CASE para segmentar actividad.
 
 #### view_order_summary
 ```sql
@@ -241,13 +243,13 @@ Resultado: Agrupa por created_at::date para obtener ventas diarias.
 
 ```sql
 -- Conectar como report_user
-psql -U report_user -d bd_act6 -c "SELECT * FROM view_ranking_products LIMIT 1;"
+psql -U "$DB_APP_USER" -d "$POSTGRES_DB" -c "SELECT * FROM view_ranking_products LIMIT 1;"
 ```
 Resultado: Acceso permitido, retorna datos.
 
 ```sql
 -- Intentar acceso a tabla base (debe fallar)
-psql -U report_user -d bd_act6 -c "SELECT * FROM productos LIMIT 1;"
+psql -U "$DB_APP_USER" -d "$POSTGRES_DB" -c "SELECT * FROM productos LIMIT 1;"
 ```
 Resultado: `ERROR: permission denied for table productos`
 
@@ -311,10 +313,10 @@ Resultado: `ERROR: permission denied for table productos`
 
 #### view_user_activity
 ```
- usuario_id | nombre        | email               | ultima_compra | dias_sin_comprar
-------------+---------------+---------------------+---------------+------------------
-     1      | Juan Pérez    | juan@example.com    |  2024-02-04   |        0
-     2      | María García  | maria@example.com   |  2024-02-01   |        3
-     3      | Carlos López  | carlos@example.com  |  2024-01-25   |       10
-     4      | Ana Rodríguez | ana@example.com     |  2024-02-03   |        1
+ cliente        | ultima_vez_visto | gasto_historico | segmento_actividad
+---------------+------------------+-----------------+--------------------
+ Juan Pérez    | 2024-02-04       |     2450.50     | Reciente
+ María García  | 2024-02-01       |     1980.75     | Reciente
+ Carlos López  | 2024-01-25       |      890.25     | Latente
+ Ana Rodríguez | 2024-02-03       |      520.10     | Reciente
 ```
