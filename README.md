@@ -19,7 +19,7 @@ Dashboard en Next.js que muestra 7 reportes desde VIEWS en PostgreSQL. La aplica
    cp .env.example .env
    ```
 
-3. En Classroom se entregara un archivo `.en.txt`. Copia su contenido y pegalo en tu `.env`.
+3. En Classroom se adjunta el archivo `.enviroments.txt` con las credenciales. Copia su contenido y pegalo en tu `.env`.
 
 4. Levanta todo:
    ```bash
